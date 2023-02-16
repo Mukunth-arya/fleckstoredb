@@ -5,21 +5,32 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 var (
-	Expect           = []byte{}
-	TotalPayloadSize uint32
+	Expect = []byte{}
+
+	TimeStamp  = 12345678910
+	KeySize    = 12
+	ValueSize  = 15
+	flags      = 1
+	TTL        = 1
+	BucketSize = 18
+	status     = 0
+	Txid       = 0
 )
 
 type TestEncodeddata struct {
-	Test *Entry
+	suite.Suite
+	Test       Entry
+	ExpectData []byte
 }
 
 func NewInit() *TestEncodeddata {
 
 	return &TestEncodeddata{
-		Test: &Entry{
+		Test: Entry{
 			Keys:  []byte("sampleKey"),
 			Value: []byte("samplevalues"),
 			Meta: &Metadata{
@@ -37,20 +48,25 @@ func NewInit() *TestEncodeddata {
 				BucketSize: uint32(len("sampletotalpayload")),
 			},
 		},
+		ExpectData: []byte{232, 71, 195, 158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 115, 97, 109, 112, 108, 101, 116, 111, 116, 97, 108, 112, 97, 121, 108, 111, 97, 100, 115, 97, 109, 112, 108, 101, 75, 101, 121, 0, 0, 0, 115, 97, 109, 112, 108, 101, 118, 97, 108, 117, 101, 115, 0, 0, 0},
 	}
 
 }
-func SetTheExactPayLoadSize() {
-	if len(Expect) == 0 {
+func (s *TestEncodeddata) TestEncodeData() {
 
-		Expect = []byte{232, 71, 195, 158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 5, 97, 109, 112, 108, 101, 116, 111, 116, 97, 108, 112, 97, 121, 108, 111, 97, 100, 115, 97, 109, 112, 108, 101, 75, 101, 121, 0, 0, 0, 115, 97, 109, 112, 108, 101, 118, 97, 108, 117, 101, 115, 0, 0, 0}
-	}
-}
-func (s *TestEncodeddata) TestencodeData(t *testing.T) {
-	SetTheExactPayLoadSize()
 	// sample payload size for testing
-	TotalPayloadSize = 50
-	Ok_to_process := reflect.DeepEqual(s.Test.Endode_Payload(), Expect)
-	assert.True(t, Ok_to_process, "Encoding is failed")
 
+	Ok_to_process := reflect.DeepEqual(s.Test.Endode_Payload(), s.ExpectData)
+	assert.True(s.T(), Ok_to_process, "Encoding Test is failed")
+
+}
+func (s *TestEncodeddata) TestNilDataReturn() {
+	if oK := s.Test.CheckPayloadisEmpty(); oK {
+		assert.Fail(s.T(), "entryIsZeroTestFail")
+	}
+}
+
+func TestPayload(t *testing.T) {
+
+	suite.Run(t, new(TestEncodeddata))
 }

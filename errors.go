@@ -11,4 +11,6 @@ var (
 	ErrKeyIsLarge = errors.New("key is too large")
 	//The Value is too large than the given size
 	ErrValueisLarge = errors.New("the value is too large than the given size")
+	// Unable to parse the payload the error is continued and the error is thrown
+	ParseError = errors.New("the parse error")
 )

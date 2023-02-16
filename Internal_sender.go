@@ -5,6 +5,10 @@ import (
 	"hash/crc32"
 )
 
+var (
+	TotalPayloadSize uint32
+)
+
 type Entry struct {
 	Keys  []byte
 	Value []byte
@@ -35,7 +39,7 @@ func (e *Entry) TotalPayloadStoreSize() uint32 {
 	return (TotalPayloadSize + e.Meta.KeySize + e.Meta.ValueSize + e.Meta.BucketSize)
 }
 func (e *Entry) Endode_Payload() []byte {
-
+	TotalPayloadSize = 50
 	payload := make([]byte, e.TotalPayloadStoreSize())
 
 	// copy the remaing data rather than the metadata  and
@@ -72,4 +76,36 @@ func (e *Entry) MakePayloadEntry(payload []byte) {
 	binary.LittleEndian.PutUint16(payload[32:34], uint16(e.Meta.Status))
 	binary.LittleEndian.PutUint16(payload[34:36], uint16(e.Meta.TXid))
 
+}
+func (s *Entry) CheckPayloadisEmpty() bool {
+	if s.Meta.KeySize == 0 && s.Meta.ValueSize == 0 {
+		return false
+	}
+	return true
+
+}
+func (s *Entry) ParseTheMeta(Buf []byte) error {
+	if len(Buf) != 0 {
+		s.Meta.TimeStamp = binary.LittleEndian.Uint64(Buf[4:12])
+		s.Meta.KeySize = binary.LittleEndian.Uint32(Buf[12:16])
+		s.Meta.ValueSize = binary.LittleEndian.Uint32(Buf[16:20])
+		s.Meta.flags = binary.LittleEndian.Uint16(Buf[20:22])
+		s.Meta.TTL = binary.LittleEndian.Uint32(Buf[22:26])
+		s.Meta.BucketSize = binary.LittleEndian.Uint32(Buf[26:30])
+
+		s.Meta.Status = binary.LittleEndian.Uint16(Buf[32:34])
+		s.Meta.TXid = binary.LittleEndian.Uint16(Buf[34:36])
+	} else {
+		return ParseError
+	}
+	return nil
+}
+func (s *Entry) ParseTheContent(Buf []byte) error {
+	if s.Meta.KeySize == 0 && s.Meta.ValueSize == 0 {
+		return ParseError
+	}
+	s.Keys = Buf[(TotalPayloadSize + s.Meta.BucketSize):(TotalPayloadSize + s.Meta.BucketSize + s.Meta.KeySize)]
+	s.Meta.Bucket = Buf[(TotalPayloadSize):(TotalPayloadSize + s.Meta.BucketSize)]
+	s.Value = Buf[(TotalPayloadSize + s.Meta.BucketSize + s.Meta.KeySize):(TotalPayloadSize + s.Meta.BucketSize + s.Meta.KeySize + s.Meta.ValueSize)]
+	return nil
 }
