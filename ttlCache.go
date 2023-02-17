@@ -10,12 +10,5 @@ const (
 	TTL_NeverExpire time.Duration = -10
 )
 
-type CacheHarmonize struct {
-	EntryData      *Entry
-	LifeTime       time.Duration
-	End_Of_journey time.Time
-	Stuck_here     bool
-}
-
 type TTlCache struct {
 }

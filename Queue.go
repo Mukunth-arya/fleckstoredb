@@ -1,10 +1,15 @@
 package fleckstoredb
 
 import (
+	"errors"
 	"sync"
 )
 
 type Elements []CacheHarmonize
+
+var (
+	ErrProcessQueue = errors.New("Unable to Process Queue")
+)
 
 type PriorityQueue struct {
 	// The Entry is added to the queue
@@ -22,99 +27,109 @@ type PriorityQueue struct {
 	//Array of queue to do fleshout
 	Flesh_In_Out_Lock sync.Mutex
 }
-// Intialize The Queue have to be prioritized 
-func initialLizeThequeue(Size_Default int) *PriorityQueue {
-	return &PriorityQueue{
-		Entry:     make(CacheHarmonize,Size_Default), // Memory Leak Protection
-		Lock:      &sync.Mutex{},
-		Execution: make(chan bool, 1),
-		Flesh_In_Out_Lock: &sync.Mutex{},
-		wg: &sync.WaitGroup{},
-	}
-}
-func (s *PriorityQueue) Enqueue(ch *CacheHarmonize)error {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
-	if len(*s.Entry) == nil{
-         return nil
-	}
-    
 
+//Load the data into The queue
+//And sort the data in the queue
+//Here traditional heap sort is used here
+func (s *Elements) Enqueue(Element *CacheHarmonize) {
+	var (
+		entry int
+	)
+	*s = append(*s, *Element)
+	// Length of the given element
+	entry = s.Len()
+	entry = entry / 2
+	if entry >= 1 {
 
-}
+		for i := entry; i >= 0; i-- {
+			s.Heapify(entry, i)
+		}
+		entry = s.Len()
+		for i := entry - 1; i >= 0; i-- {
+			//After HEapify The Larger data is Moved to begining
+			//of the index and Now swap it to End of the array
+			s.Swap(0, i)
+			//Heapify Again Rest of the elements is swapped
+			s.Heapify(i, 0)
+		}
 
-//Heapify The array means move the sudden changes of an array value
-//If if meets the certains logics
-func (s *PriorityQueue) Heapify(Size, i int) {
-	var left = 2*i + 1
-	var right = 2*i + 2
-	var largest = i
-	if left < largest && s.Queue[left].End_Of_journey.Minute() > s.Queue[largest].End_Of_journey.Minute() {
-		largest = left
-	}
-	if right < largest && s.Queue[right].End_Of_journey.Minute() > s.Queue[right].End_Of_journey.Minute() {
-		largest = right
-	}
-	if largest != i {
-		var temp = s.Queue[i]
-		s.Queue[i] = s.Queue[largest]
-		s.Queue[largest] = temp
-		s.Heapify(Size, largest)
-	}
-}
-
-// Get the Size of The array
-func (s *PriorityQueue) GetTheValueofN() int {
-
-	return len(s.Queue) / 2
-}
-
-// Tradtional HeapSort is used to sort
-// Instead of using the quicksort or mergeSort
-
-func (s *PriorityQueue) HeapSort() {
-	N := s.GetTheValueofN()
-	for i := N/2 - 1; i >= 0; i-- {
-		s.Heapify(N, i)
-	}
-	for i := N - 1; i >= 0; i-- {
-		var temp = s.Queue[i]
-		s.Queue[i] = s.Queue[0]
-		s.Queue[0] = temp
-		s.Heapify(i, 0)
 	}
 
 }
 
-// This function Swap the elements in the queue
-func(s.)Swap(i, j int) {
+//Heap sort is used for cache efficient Model rather than the
+//traditional quicksort or mergesort is not efficient for cache management
+//HeapSort has an time complexity of 0(NlogN)
+func (s *Elements) Heapify(n, i int) {
+	var Larger = i
+	var Left = 2*n + 1
+	var Right = 2*n + 2
+
+	if Larger < n && (*s)[Left].LifeTime > (*s)[i].LifeTime {
+		Larger = Left
+	}
+	if Larger < n && (*s)[Right].LifeTime > (*s)[i].LifeTime {
+		Larger = Right
+	}
+	//compare the data that the larger
+	if Larger != i {
+		s.Swap(i, Larger)
+		//Go it recursively for muchMore sort
+		s.Heapify(n, Larger)
+	}
 
 }
 
-//Pop removes the miniMalValue from the array of the data
-//Means from the lowest to highest
-//Pop is equal to remove
-func (s *PriorityQueue) Pop() {
-
-	s.InterChange(0)
-
+//The length of the Givenqueue
+func (s *Elements) Len() int {
+	return len(*s)
 }
 
-// Interchange the value after the value is popped
-// And intercahnge the value and store into the array
-func (s *PriorityQueue) InterChange(i int) {
-	var Ic []CacheHarmonize
-	for j := i; j < len(s.Queue); j++ {
-		if j == len(s.Queue)-1 {
+// Swap The Elements Inside The queue
+//If It meets Required Conditions
+func (s *Elements) Swap(i, j int) {
+	var eleMent = (*s)[i]
+	(*s)[i] = (*s)[j]
+	(*s)[j] = eleMent
+}
+
+//Get all  the elements from the Queue
+//And Empty The queue from By Popping the elements
+func (s *Elements) GetAll() (error, []*CacheHarmonize) {
+
+	len := s.Len()
+	var GetAll = make([]*CacheHarmonize, len)
+	if len == 0 {
+		return ErrProcessQueue, nil
+	}
+	for i := 0; i <= len-1; i++ {
+		GetAll = append(GetAll, s.Pop())
+	}
+	return nil, GetAll
+}
+
+//Pop the elements Means Getting the elements one by one
+//From the sorted array of queue
+//Means popping in the frontWords
+func (s *Elements) Pop() (datas *CacheHarmonize) {
+	var ele = s.GetFront()
+	var len = s.Len()
+	var Reininitalize = make([]CacheHarmonize, len)
+	if len != 0 {
+		datas = &ele
+		return datas
+	}
+	for i := 0; i < len; i++ {
+		if i == len-1 {
 			break
 		}
-		Ic[i] = s.Queue[j+1]
+		Reininitalize = append(Reininitalize, (*s)[i+1])
 	}
-	s.Queue = Ic
-
+	*s = Reininitalize
+	return
 }
-func (s *PriorityQueue) DisplayFront() *CacheHarmonize {
 
-	return &s.Queue[0]
-
+//Get the elements from the first Index
+func (s *Elements) GetFront() CacheHarmonize {
+	return (*s)[0]
 }
