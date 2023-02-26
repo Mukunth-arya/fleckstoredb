@@ -8,16 +8,16 @@ import (
 type Elements []CacheHarmonize
 
 var (
-	ErrProcessQueue = errors.New("Unable to Process Queue")
+	ErrProcessQueue  = errors.New("Unable to Process Queue")
+	ErrLoadElements  = errors.New("Unable to load the elements inside the queue")
+	ErrEmptyElements = errors.New("Unable to retrive the elements")
 )
 
 type PriorityQueue struct {
 	// The Entry is added to the queue
 	Entry *Elements
 	Lock  *sync.Mutex
-	// Multiple go routines are executed
-	// One By One in different runtime executions
-	wg *sync.WaitGroup
+
 	//Ready For execution the value is 1
 	//And not for execution and it will be setted to 0
 	Execution chan bool
@@ -103,7 +103,7 @@ func (s *Elements) GetAll() (error, []*CacheHarmonize) {
 		return ErrProcessQueue, nil
 	}
 	for i := 0; i <= len-1; i++ {
-		GetAll = append(GetAll, s.Pop())
+		GetAll = append(GetAll, s.GetFront())
 	}
 	return nil, GetAll
 }
@@ -111,13 +111,12 @@ func (s *Elements) GetAll() (error, []*CacheHarmonize) {
 //Pop the elements Means Getting the elements one by one
 //From the sorted array of queue
 //Means popping in the frontWords
-func (s *Elements) Pop() (datas *CacheHarmonize) {
-	var ele = s.GetFront()
+func (s *Elements) Pop() {
+
 	var len = s.Len()
 	var Reininitalize = make([]CacheHarmonize, len)
 	if len != 0 {
-		datas = &ele
-		return datas
+
 	}
 	for i := 0; i < len; i++ {
 		if i == len-1 {
@@ -130,6 +129,67 @@ func (s *Elements) Pop() (datas *CacheHarmonize) {
 }
 
 //Get the elements from the first Index
-func (s *Elements) GetFront() CacheHarmonize {
-	return (*s)[0]
+func (s Elements) GetFront() *CacheHarmonize {
+	return &(s)[0]
+}
+
+// Initialize the newPriority queue
+func NewInitPriorityQueue() *PriorityQueue {
+	ValueInit := &PriorityQueue{
+		Entry:     nil,
+		Execution: make(chan bool, 1),
+	}
+	return ValueInit
+}
+
+//Put the array of elements in the queue
+//And The Elements is sorted based on the TTL
+func (s *PriorityQueue) Put(Entry ...CacheHarmonize) error {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
+	if (*s).IsFleshOut == false {
+		return ErrLoadElements
+	}
+	if s.Entry == nil {
+
+		for _, i := range Entry {
+
+			s.Entry.Enqueue(&i)
+		}
+
+	}
+	return nil
+}
+
+//TO enqueue the all the elements from the queue
+//Means setting the state of the queue in the zerostate
+func (s *PriorityQueue) FLeshOut() {
+	s.Flesh_In_Out_Lock.Lock()
+	defer s.Flesh_In_Out_Lock.Unlock()
+	if (*s).IsFleshOut == true {
+		(*s).Entry = nil
+		(*s).IsFleshOut = true
+
+	}
+
+}
+
+// Get the empty all the elements from the queue
+// And the set the queue in the empty state
+func (s *PriorityQueue) GetallElements() (error, []*CacheHarmonize) {
+	s.Lock.Lock()
+	s.Lock.Unlock()
+	err, ValueELements := s.Entry.GetAll()
+	if err != nil {
+		return err, nil
+	}
+	return nil, ValueELements
+}
+
+//Get the elements First iNdex elementS from the queue
+//Means the highest of the element
+func (s *PriorityQueue) GetFrontElement() *CacheHarmonize {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
+	return (*s).Entry.GetFront()
 }

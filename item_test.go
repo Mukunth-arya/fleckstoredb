@@ -42,11 +42,39 @@ func TestJourneyEnd(t *testing.T) {
 	var dataInit = InitializeTheEntry(&Entry{}, expect)
 	dataInit.sEtPeriod()
 	time.Sleep(30)
-	err, IS := dataInit.IsJourneyEnded()
-	if err != nil {
-		t.Errorf(err.Error())
-	}
+	IS := dataInit.IsJourneyEnded()
+
 	if IS {
 		t.Log("The TImeLImits Is Expired")
+	}
+}
+func TestTTlSet(t *testing.T) {
+	var checkvalue bool
+
+	expect = 2 * time.Minute
+	var dataInit = InitializeTheEntry(&Entry{}, expect)
+	time.Sleep(3 * time.Minute)
+	// check whether Lifetimeis setted to 0
+	// And is expired is marked to true
+	dataInit.SetExpirationTime()
+	checkvalue = assert.Equal(t, 0, dataInit.TimeTTlRemain)
+	if checkvalue {
+		checkvalue = assert.Equal(t, 1, dataInit.isExpired)
+		if checkvalue {
+			t.Log("TTL expiration set is valid")
+		}
+	} else {
+		t.Log("TTL ExpitaionSet failed")
+	}
+	expect = 30 * time.Minute
+	dataInit = InitializeTheEntry(&Entry{}, expect)
+	dataInit.SetExpirationTime()
+	checkvalue = assert.Equal(t, 35, dataInit.TimeTTlRemain)
+	if checkvalue {
+		checkvalue = assert.Equal(t, 0, dataInit.isExpired)
+		if checkvalue {
+			t.Log("TTL Expiration is valid in phase2 check")
+		}
+	} else {
 	}
 }
