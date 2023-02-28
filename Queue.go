@@ -35,6 +35,7 @@ func (s *Elements) Enqueue(Element *CacheHarmonize) {
 	var (
 		entry int
 	)
+
 	*s = append(*s, *Element)
 	// Length of the given element
 	entry = s.Len()

@@ -30,13 +30,19 @@ type CacheHarmonize struct {
 	isExpired chan bool
 
 	TimeTTlRemain time.Duration
+	//Lra Policy is used to set recently used cache
+	//Move_it_to back when Limit Exceed It will Dropped
+	LRA string
 }
 
 func InitializeTheEntry(entry *Entry, TTl time.Duration) *CacheHarmonize {
 	value := &CacheHarmonize{
-		EntryData:  entry,
-		LifeTime:   TTl,
-		Stuck_here: make(chan bool, 1),
+		EntryData:     entry,
+		LifeTime:      TTl,
+		Stuck_here:    make(chan bool, 1),
+		isExpired:     make(chan bool, 0),
+		TimeTTlRemain: TTl,
+		LRA:           "", //MemorySpillAvoid
 	}
 	go value.sEtPeriod()
 	return value

@@ -1,16 +1,29 @@
 package fleckstoredb
 
-import "time"
+import (
+	"container/list"
+	"encoding/binary"
+	"errors"
+	"runtime"
+	"sync"
+)
 
 const (
+	// one hour five minutes is the default time remian for the data to be
+	// in the ttl_cache if it exceeds with the given condition and it will be evicted with certain reason
+	Default_time = 65 // 3.9e+6 in seconds
+
 	//Key_is_deleted_on user_Request
-	//It_is_not_deleted when cache is full
 	//when_Cache_is_full automatically it will be deleted from the cache_data
 	EvictReasonDeleted Evcitioneason = iota
 	//Key_valid_time_is_expired
 	//Then the eviction is setted to be Expired
 	//Without_Expiration_the will not be deleted
 	EvictReasonExpired
+	//Average size for an cache is 20 kb
+	//So Only 10 element is fixed
+	//The value will not incremented
+	Default_size = 20
 )
 
 const (
@@ -25,33 +38,252 @@ type Evcitioneason int
 
 func (s Evcitioneason) SetEvictionReason() string {
 
-	return [...]string{0: "KeyDeleted", 1: "keyExpired"}[s]
+	return [...]string{1: "keydeleted", 2: "keyexpired"}[s]
 
 }
 
 type EvictionPolicy int
 
 func (s EvictionPolicy) SetEvictionPolicy() string {
-	return [...]string{0: "LRA"}[s]
+	return [...]string{1: "LRA"}[s]
 }
 
-//DoublyLinkedList Is used Here
-//ratherThan the traditional singlyLinklist
-//The cache willbe present On Each node
-//We can Move Forward and backward the Cache Is present
-//pointer is present for Next and PreviousNode
-type Doubly_Node struct {
-	Node                   *CacheHarmonize
-	LeastRecentaccessedKey time.Duration
-	Next                   *Doubly_Node
-	Previous               *Doubly_Node
+//TTl_cache elements are inserted and deleted
+//On user request...
+type TTL_Cache struct {
+	mu           sync.Mutex
+	List_element map[uint64]*Entry
+	//Doubly_link_list is used here rather than
+	//the singly linklist the cache is present
+	//from head to tail node each node has pointer to next Node
+	Doubly_list *list.List
+	//The number of element is  inserted into the cache
+	//Each time the new element is  inserted The the value is  incremented
+	N        int
+	eviction *Eviction
 }
-type Doubly_Link_List struct {
-	//TheValue is pushed Into PriorityQueue
-	//It is sorted in the order of low to high\
-	//HEap sort is used for sorting
-	CacheQueue *PriorityQueue
-	Cache      map[int]*DoublyList
-	headNode   *Doubly_Node
-	TailNode   *DoublyList
+type Eviction struct {
+	mu sync.Mutex
+	// During Eviction the record of the data will be maintained and verified
+	//And the Eviction reason will be update
+	EvictionMap map[string]any
+}
+
+//Initialize the memory For Large data entry to the queue
+func NewTTlInit() *TTL_Cache {
+
+	cache := &TTL_Cache{
+		List_element: make(map[uint64]*Entry),
+		Doubly_list:  list.New(),
+
+		eviction: &Eviction{
+			EvictionMap: make(map[string]any),
+		},
+	}
+
+	return cache
+}
+
+func (s *TTL_Cache) setThecache(TTlEntry *Entry) {
+
+	// check the data is present in the queue if it's present then the entry will be not
+	// permitted....
+	BigEndian := s.changeEncodeState(TTlEntry.Keys)
+	s.mu.Lock()
+	Present := s.List_element[BigEndian]
+	s.mu.Unlock()
+	// if key is present the data Will not be setted in the cache
+	if Present != nil {
+		return
+	}
+	s.List_element[BigEndian] = TTlEntry
+	//EachTimeTheNewEntry comes the queue will be cleared from the back
+	if s.N == Default_size {
+		s.EvictTheSingledataOut()
+	}
+	//Initialize The Cache-Harmonize Value
+	value := InitializeTheEntry(TTlEntry, Default_time)
+
+	s.mu.Lock()
+	s.Doubly_list.PushFront(value)
+	//Single_data is inserted So increment the value
+	s.N++
+	s.mu.Unlock()
+}
+
+//Get the single_data out from the cache_value
+//setted as an lra and pushed back
+func (s *TTL_Cache) getThecache(key []byte) *Entry {
+
+	//Get the Encoded the into uint64
+	Decodedvalue := s.changeEncodeState(key)
+	//Check The data is Not Present
+	//Then through it out  a error
+	s.mu.Lock()
+	Present := s.List_element[Decodedvalue]
+	s.mu.Unlock()
+	if Present == nil {
+		errors.New("Key is not present")
+		return nil
+	}
+	temp := s.Doubly_list.Front()
+	for {
+		if temp == nil {
+			break
+		}
+		encodeCheck := s.changeEncodeState(temp.Value.(CacheHarmonize).EntryData.Keys)
+		if encodeCheck == Decodedvalue {
+			Cd := temp.Value.(CacheHarmonize)
+			if !Cd.IsJourneyEnded() {
+
+				go func() {
+					s.mu.Lock()
+					s.Doubly_list.MoveToBack(temp)
+					s.Doubly_list.Remove(temp)
+					s.mu.Unlock()
+				}()
+				break
+			}
+			if Cd.IsJourneyEnded() {
+				s.EvictThedataOnExpiration(temp)
+			}
+
+		}
+		temp = temp.Next()
+	}
+	return Present
+}
+
+//Remove The data from the queue on user demand
+//And set the It will preceed with the eviction policy
+
+func (s *TTL_Cache) RemoveTheCache(key []byte) {
+	// check the data is present in the queue if it's present then the entry will be not
+	// permitted....
+	BigEndian := s.changeEncodeState(key)
+	s.mu.Lock()
+	Present := s.List_element[BigEndian]
+	s.mu.Unlock()
+	// if key is present the data Will not be setted in the cache
+	if Present == nil {
+		return
+	}
+	temp := s.Doubly_list.Front()
+	for {
+		if temp == nil {
+			break
+		}
+		encodeCheck := s.changeEncodeState(temp.Value.(CacheHarmonize).EntryData.Keys)
+		if encodeCheck == BigEndian {
+			s.EvictTheOnRemoveDemand(temp)
+			break
+		}
+		temp = temp.Next()
+	}
+
+}
+
+// Get All The Element out of cache queue
+//Reset The entireScheme and entire Value
+func (s *TTL_Cache) GetAllTheData() (datas []CacheHarmonize) {
+	temp := s.Doubly_list.Front()
+
+	for {
+		if temp == nil {
+			break
+		}
+		datas = append(datas, temp.Value.(CacheHarmonize))
+		temp = temp.Next()
+	}
+	//Reset the entire list
+	s.Doubly_list = list.New()
+	return
+
+}
+
+func (s *TTL_Cache) changeEncodeState(key []byte) uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	value := binary.BigEndian.Uint64(key)
+	return value
+}
+
+//EvictThedataFromtheQueue when the capacity is reached and
+//element from the back will be removed rather than the front
+func (s *TTL_Cache) EvictTheSingledataOut() {
+	var wg sync.WaitGroup
+	//Remove the data from the back
+	//Because It is matched with LRA policy
+	s.mu.Lock()
+
+	s.eviction.EvictionMap[EvictReasonDeleted.SetEvictionReason()] = s.Doubly_list.Back()
+	s.mu.Unlock()
+
+	// It will be executed Only-when
+	// the multithreaded execution means more number of cpu
+	if runtime.NumCPU() > 1 {
+		go func() {
+			s.mu.Lock()
+			wg.Add(1)
+			s.Doubly_list.Remove(s.Doubly_list.Back())
+			s.N--
+			wg.Done()
+			s.mu.Unlock()
+		}()
+		wg.Wait()
+	}
+}
+
+//Evict the data on Expiration
+func (s *TTL_Cache) EvictThedataOnExpiration(Value *list.Element) {
+	var wg sync.WaitGroup
+	//Evict The single data out of the queue on expiration...
+	s.mu.Lock()
+	s.eviction.EvictionMap[EvictReasonExpired.SetEvictionReason()] = Value
+	s.mu.Unlock()
+	// It will be executed Only-when
+	// the multithreaded execution means more number of cpu
+	if runtime.NumCPU() > 1 {
+		go func() {
+			s.mu.Lock()
+			wg.Add(1)
+			s.Doubly_list.Remove(Value)
+			s.N--
+			wg.Done()
+			s.mu.Unlock()
+		}()
+		wg.Wait()
+	}
+
+}
+
+//Evict The data On the user demand
+//Eviction Policy is preceeded
+func (s *TTL_Cache) EvictTheOnRemoveDemand(elem *list.Element) {
+
+	var wg sync.WaitGroup
+	//Evict The single data out of the queue on expiration...
+	s.mu.Lock()
+	s.eviction.EvictionMap[EvictReasonDeleted.SetEvictionReason()] = elem
+	s.mu.Unlock()
+	// It will be executed Only-when
+	// the multithreaded execution means more number of cpu
+	if runtime.NumCPU() > 1 {
+		go func() {
+			s.mu.Lock()
+			wg.Add(1)
+			s.Doubly_list.Remove(elem)
+			s.N--
+			wg.Done()
+			s.mu.Unlock()
+		}()
+		wg.Wait()
+	}
+
+}
+
+//If_admin_command send the all the element want to remove from the
+//cache or clear the entire state this method will pop up
+func (s *TTL_Cache) ClearThecachedata() {
+	s.Doubly_list = list.New()
 }
