@@ -202,8 +202,7 @@ func (s *TTL_Cache) GetAllTheData() (datas []CacheHarmonize) {
 }
 
 func (s *TTL_Cache) changeEncodeState(key []byte) uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+
 	value := binary.BigEndian.Uint64(key)
 	return value
 }
@@ -285,5 +284,10 @@ func (s *TTL_Cache) EvictTheOnRemoveDemand(elem *list.Element) {
 //If_admin_command send the all the element want to remove from the
 //cache or clear the entire state this method will pop up
 func (s *TTL_Cache) ClearThecachedata() {
+	s.mu.Lock()
 	s.Doubly_list = list.New()
+	//Change The Number oF entry to nil state
+	s.N = 0
+	s.mu.Unlock()
+
 }
