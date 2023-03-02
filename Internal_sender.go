@@ -11,7 +11,7 @@ var (
 
 type Entry struct {
 	Keys  []byte
-	Value []byte
+	Value interface{}
 	Meta  *Metadata
 	Crc   uint32
 }
