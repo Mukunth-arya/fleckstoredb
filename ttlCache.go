@@ -6,12 +6,13 @@ import (
 	"errors"
 	"runtime"
 	"sync"
+	"time"
 )
 
 var (
 	// one hour five minutes is the default time remian for the data to be
 	// in the ttl_cache if it exceeds with the given condition and it will be evicted with certain reason
-	Default_time = 65 // 3.9e+6 in seconds
+	Default_time time.Duration // 3.9e+6 in seconds
 )
 
 const (
@@ -105,6 +106,7 @@ func (s *TTL_Cache) setThecache(TTlEntry *Entry) *CacheHarmonize {
 		s.EvictTheSingledataOut()
 	}
 	//Initialize The Cache-Harmonize Value
+	Default_time = 65
 	value := InitializeTheEntry(TTlEntry, Default_time)
 
 	s.mu.Lock()
@@ -142,10 +144,14 @@ func (s *TTL_Cache) getThecache(key []byte) *Entry {
 
 				go func() {
 					s.mu.Lock()
-					s.Doubly_list.MoveToBack(temp)
-					s.Doubly_list.Remove(temp)
+					swap1 := temp
+					temp = nil
+
+					s.Doubly_list.MoveToBack(swap1)
+
 					s.mu.Unlock()
 				}()
+				return Present
 				break
 			}
 			if Cd.IsJourneyEnded() {
@@ -155,7 +161,7 @@ func (s *TTL_Cache) getThecache(key []byte) *Entry {
 		}
 		temp = temp.Next()
 	}
-	return Present
+	return nil
 }
 
 //Remove The data from the queue on user demand
