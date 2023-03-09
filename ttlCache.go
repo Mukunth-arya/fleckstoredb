@@ -27,7 +27,7 @@ const (
 	//Average size for an cache is 20 kb
 	//So Only 10 element is fixed in cache queue
 	//This value will not incremented
-	Default_size = 20
+	Default_size = 10
 )
 
 const (
@@ -77,11 +77,11 @@ type Eviction struct {
 func NewTTlInit() *TTL_Cache {
 
 	cache := &TTL_Cache{
-		List_element: make(map[string]*Entry),
+		List_element: make(map[string]*Entry, 10),
 		Doubly_list:  list.New(),
 
 		eviction: &Eviction{
-			EvictionMap: make(map[string]any),
+			EvictionMap: make(map[string]any, 10),
 		},
 	}
 
