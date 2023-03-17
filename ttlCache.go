@@ -145,9 +145,8 @@ func (s *TTL_Cache) getThecache(key []byte) *Entry {
 				go func() {
 					s.mu.Lock()
 					swap1 := temp
-					temp = nil
-
 					s.Doubly_list.MoveToBack(swap1)
+					temp = nil
 
 					s.mu.Unlock()
 				}()
@@ -244,11 +243,11 @@ func (s *TTL_Cache) EvictTheSingledataOut() {
 }
 
 //Evict the data on Expiration
-func (s *TTL_Cache) EvictThedataOnExpiration(Value *list.Element) {
+func (s *TTL_Cache) EvictThedataOnExpiration(Values *list.Element) {
 	var wg sync.WaitGroup
 	//Evict The single data out of the queue on expiration...
 	s.mu.Lock()
-	s.eviction.EvictionMap[EvictReasonExpired.SetEvictionReason()] = Value
+	s.eviction.EvictionMap[EvictReasonExpired.SetEvictionReason()] = Values
 	s.mu.Unlock()
 	// It will be executed Only-when
 	// the multithreaded execution means more number of cpu
@@ -256,13 +255,17 @@ func (s *TTL_Cache) EvictThedataOnExpiration(Value *list.Element) {
 		go func() {
 			s.mu.Lock()
 			wg.Add(1)
-			s.Doubly_list.Remove(Value)
+
+			s.List_element[string(Values.Value.(CacheHarmonize).EntryData.Keys)] = nil
+			s.Doubly_list.Remove(Values)
 			s.N--
 			wg.Done()
 			s.mu.Unlock()
 		}()
 		wg.Wait()
 	}
+	s.List_element[string(Values.Value.(CacheHarmonize).EntryData.Keys)] = nil
+	s.Doubly_list.Remove(Values)
 
 }
 
@@ -281,6 +284,7 @@ func (s *TTL_Cache) EvictTheOnRemoveDemand(elem *list.Element) {
 		go func() {
 			s.mu.Lock()
 			wg.Add(1)
+			s.List_element[string(elem.Value.(CacheHarmonize).EntryData.Keys)] = nil
 			s.Doubly_list.Remove(elem)
 			s.N--
 			wg.Done()
@@ -288,6 +292,8 @@ func (s *TTL_Cache) EvictTheOnRemoveDemand(elem *list.Element) {
 		}()
 		wg.Wait()
 	}
+	s.Doubly_list.Remove(elem)
+	s.List_element[string(elem.Value.(CacheHarmonize).EntryData.Keys)] = nil
 
 }
 
@@ -297,6 +303,7 @@ func (s *TTL_Cache) ClearThecachedata() {
 	s.mu.Lock()
 	s.Doubly_list = list.New()
 	//Change The Number oF entry to nil state
+	s.List_element = make(map[string]*Entry)
 	s.N = 0
 	s.mu.Unlock()
 

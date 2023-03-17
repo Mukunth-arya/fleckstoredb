@@ -187,7 +187,7 @@ func (s *PriorityQueue) GetallElements() (error, []*CacheHarmonize) {
 	return nil, ValueELements
 }
 
-//Get the elements First iNdex elementS from the queue
+//Get the elements First index elementS from the queue
 //Means the highest of the element
 func (s *PriorityQueue) GetFrontElement() *CacheHarmonize {
 	s.Lock.Lock()
